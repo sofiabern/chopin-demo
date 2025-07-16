@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+      <meta charset="UTF-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Speedtest by OpenSpeedtest.com</title>
+      <style>
+         ::-webkit-scrollbar {
+         display: none;
+         }
+         html {
+         -ms-overflow-style: none; 
+         scrollbar-width: none;
+         }
+         body{margin: 0px;}
+      </style>
+   </head>
+   <body>
+      <iframe id="OST-iFrame" src="//openspeedtest.com/selfhosted" style="width: 100vw;height: 100vh;" frameborder="0" allowfullscreen></iframe>
+      <div style="text-align: center; color: rgb(125 119 119); font-size:14px; ">
+         <a href="https://openspeedtest.com?ref=Self-Hosted-Widget&Run"  style="text-decoration:none;  color: rgb(125 119 119);"">Speed Test</a> by OpenSpeedTest™
+      </div>
+      <script>
+        // Poll to check for test results and send them to the parent window
+        const pollInterval = setInterval(() => {
+          const iframe = document.getElementById('OST-iFrame');
+          if (iframe && iframe.contentWindow) {
+            try {
+              // Access variables from the iframe's scope
+              const ost = iframe.contentWindow.ost;
+              if (ost && ost.results && ost.results.raw) {
+                const results = ost.results.raw;
+                // Check if results are populated and test is complete
+                if (results.download && results.upload && results.ping && !ost.xhr) {
+                  // Send results to parent window
+                  window.parent.postMessage({ 
+                    type: 'speedTestResults',
+                    download: results.download,
+                    upload: results.upload,
+                    ping: results.ping
+                  }, '*'); // Use a specific target origin in production
+                  
+                  // Stop polling once results are sent
+                  clearInterval(pollInterval);
+                }
+              }
+            } catch (e) {
+              // This can happen due to cross-origin restrictions if the iframe content is not fully loaded or ready
+              // console.warn('Could not access iframe content yet, will retry.');
+            }
+          }
+        }, 500); // Check every 500ms
+      </script>
+   </body>
+</html>
