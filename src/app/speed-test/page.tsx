@@ -6,70 +6,11 @@ import AuthDisplay from './components/AuthDisplay';
 import FilterControls from './components/FilterControls';
 import ResultsDisplay from './components/ResultsDisplay';
 import PastResultsTable from './components/PastResultsTable';
-
-// OpenSpeedTest widget configuration
-const SPEED_TEST_CONFIG = {
-  width: '100%',
-  height: '600px',
-  theme: 'light',
-  language: 'en',
-  server: process.env.NEXT_PUBLIC_SPEEDTEST_SERVER_URL || 'http://localhost:8080' // Using self-hosted server
-};
-
-// Custom event types for OpenSpeedTest
-interface SpeedTestResult {
-  download: number;
-  upload: number;
-  ping: number;
-}
-
-interface PastSpeedTestResult {
-  id: number;
-  location: string;
-  download_speed: number;
-  upload_speed: number;
-  ping: number;
-  timestamp: string;
-}
-
-interface SpeedTestError {
-  message: string;
-  code: number;
-}
-
-interface SpeedTestEventMap {
-  'speedtest:complete': CustomEvent<SpeedTestResult>;
-  'speedtest:error': CustomEvent<SpeedTestError>;
-}
-
-
-
-// Location formatting utilities
-const formatLocation = async (lat: number, lng: number): Promise<string> => {
-  try {
-    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
-    const data = await response.json();
-
-    // Format as City, Region, Country
-    const components = data.address;
-    return `${components.city || components.town || components.village || 'Unknown'}, ${components.state || components.county || 'Unknown'}, ${components.country}`;
-  } catch (error) {
-    console.error('Error formatting location:', error);
-    return 'Location not available';
-  }
-};
-
-// Get IP-based location
-const getIpLocation = async (): Promise<string> => {
-  try {
-    const response = await fetch('https://ipapi.co/json/');
-    const data = await response.json();
-    return `${data.city}, ${data.region}, ${data.country_name}`;
-  } catch (error) {
-    console.error('Error getting IP location:', error);
-    return 'Location not available';
-  }
-};
+import { SpeedTestResult, PastSpeedTestResult } from './lib/types';
+import { fetchAndFormatLocation } from './lib/location';
+import { SPEED_TEST_CONFIG } from './lib/config';
+import { submitSpeedTestResults } from './lib/api';
+import { setupMessageListener } from './lib/iframe';
 
 export default function SpeedTestPage() {
   const [location, setLocation] = useState('');
@@ -91,6 +32,23 @@ export default function SpeedTestPage() {
   const [filterMode, setFilterMode] = useState<'location' | 'radius'>('location');
   const [radius, setRadius] = useState<number>(10);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [aspectRatio, setAspectRatio] = useState(getAspectRatio());
+
+  function getAspectRatio() {
+    if (typeof window === 'undefined') {
+      return 9 / 16; // Default to landscape for SSR
+    }
+    return window.innerHeight > window.innerWidth ? 16 / 9 : 9 / 16;
+  }
+
+  useEffect(() => {
+    const handleResize = () => {
+      setAspectRatio(getAspectRatio());
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
 
   useEffect(() => {
@@ -101,136 +59,45 @@ export default function SpeedTestPage() {
   useEffect(() => {
     const getLocation = async () => {
       setIsLocationLoading(true);
-      try {
-        // Check if geolocation is available
-        if (navigator.geolocation) {
-          setIsGeolocationAvailable(true);
-
-          // Try to get GPS location first
-          const position = await new Promise<GeolocationPosition | null>((resolve) => {
-            navigator.geolocation.getCurrentPosition(
-              (pos) => resolve(pos),
-              (err) => {
-                console.error('GPS error, falling back to IP location:', err);
-                resolve(null);
-              },
-              { timeout: 5000 }
-            );
-          });
-
-          if (position) {
-            setCoordinates({ lat: position.coords.latitude, lng: position.coords.longitude });
-            const formattedLocation = await formatLocation(
-              position.coords.latitude,
-              position.coords.longitude
-            );
-            setLocation(formattedLocation);
-          } else {
-            const ipLocation = await getIpLocation();
-            setLocation(ipLocation);
-          }
-        } else {
-          // Use IP location if geolocation is not available
-          const ipLocation = await getIpLocation();
-          setLocation(ipLocation);
-        }
-      } catch (err) {
-        console.error('Error getting location:', err);
-        setLocation('Location not available');
-      } finally {
-        setIsLocationLoading(false);
-      }
+      const { location, coordinates, isGeolocationAvailable } = await fetchAndFormatLocation();
+      setLocation(location);
+      setCoordinates(coordinates);
+      setIsGeolocationAvailable(isGeolocationAvailable);
+      setIsLocationLoading(false);
     };
 
     getLocation();
   }, []);
 
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Log every message that comes through for debugging
-      console.log('Parent page: Received message:', {
-        origin: event.origin,
-        data: event.data,
-      });
-
-      // Check origin for security (simplified for direct index.html communication)
-      const expectedOrigin = new URL(SPEED_TEST_CONFIG.server).origin;
-      const isValidOrigin = event.origin === expectedOrigin ||
-        event.origin === 'http://localhost:8080' ||
-        event.origin === 'http://127.0.0.1:8080';
-
-      if (!isValidOrigin) {
-        console.warn(`Parent page: Ignored message from unexpected origin: ${event.origin}, expected: ${expectedOrigin}`);
-        return;
-      }
-
-      // Handle test started message
-      if (event.data && event.data.message === 'test_started') {
-        console.log('Parent page: Test started message received, updating state.');
-        setSpeedTestResults(null);
-        setError(null);
-        setIsTestRunning(true);
-      }
-
-      if (event.data && event.data.message === 'test_completed') {
-        console.log('Parent page: Test completed message received, updating state.');
-        const results = event.data.results;
-        setSpeedTestResults({
-          download: parseFloat(results.download),
-          upload: parseFloat(results.upload),
-          ping: parseFloat(results.ping),
-        });
-        setIsTestRunning(false);
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
+    const cleanup = setupMessageListener({
+      setSpeedTestResults,
+      setError,
+      setIsTestRunning,
+    });
+    return cleanup;
   }, []);
 
   const handleSubmit = async () => {
-    if (!speedTestResults || !coordinates) return;
+    if (!speedTestResults) return;
 
     setIsSubmitting(true);
     setSubmissionMessage(null);
 
-    try {
-      const response = await fetch('/api/speed-test', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          location: location,
-          download_speed: speedTestResults.download,
-          upload_speed: speedTestResults.upload,
-          ping: speedTestResults.ping,
-          latitude: coordinates.lat,
-          longitude: coordinates.lng
-        }),
-      });
+    const result = await submitSpeedTestResults({
+      location,
+      speedTestResults,
+      coordinates
+    });
 
-      const data = await response.json();
+    setSubmissionMessage(result.message);
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit results');
-      }
-
-      setSubmissionMessage('Results submitted successfully!');
+    if (result.success) {
       // Automatically refresh the past results list
       await fetchPastResults();
-    } catch (err) {
-      if (err instanceof Error) {
-        setSubmissionMessage(`Error: ${err.message}`);
-      } else {
-        setSubmissionMessage('An unknown error occurred during submission.');
-      }
-    } finally {
-      setIsSubmitting(false);
     }
+
+    setIsSubmitting(false);
   };
 
   const fetchPastResults = async (page = 1) => {
@@ -315,16 +182,24 @@ export default function SpeedTestPage() {
 
       {!speedTestResults && (
         <div className="mt-4">
-          <iframe
-            key={iframeKey}
-            ref={iframeRef}
-            src={`${SPEED_TEST_CONFIG.server}/index.html`}
-            width={SPEED_TEST_CONFIG.width}
-            height={SPEED_TEST_CONFIG.height}
-            frameBorder="0"
-            className="w-full"
-            title="OpenSpeedTest"
-          ></iframe>
+          <div style={{ position: 'relative', width: '100%', paddingTop: `${aspectRatio * 100}%` }}>
+            <iframe
+              key={iframeKey}
+              ref={iframeRef}
+              src={`${SPEED_TEST_CONFIG.server}/index.html`}
+              frameBorder="0"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                transformOrigin: 'top left',
+              }}
+              className="w-full h-full"
+              title="OpenSpeedTest"
+            ></iframe>
+          </div>
         </div>
       )}
 

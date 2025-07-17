@@ -1,10 +1,6 @@
 "use client";
 
-interface SpeedTestResult {
-  download: number;
-  upload: number;
-  ping: number;
-}
+import { SpeedTestResult } from '../lib/types';
 
 interface ResultsDisplayProps {
   speedTestResults: SpeedTestResult;

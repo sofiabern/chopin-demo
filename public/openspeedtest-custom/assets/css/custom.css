@@ -1,0 +1,26 @@
+/* 
+  Custom styles to make the OpenSpeedTest UI embeddable and responsive.
+*/
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden !important; /* Prevent any scrollbars from within the iframe's document */
+}
+
+/* Hide the credits footer to prevent extra height */
+.Credits {
+  display: none !important;
+}
+
+/* 
+  Override the default viewport-unit sizing.
+  This makes the SVG respect the dimensions of the parent iframe container
+  instead of trying to fill the whole browser viewport, which was causing the scrollbar.
+*/
+.openSpeedtestApp {
+  display: block !important;
+  height: 100% !important;
+  width: 100% !important;
+} 

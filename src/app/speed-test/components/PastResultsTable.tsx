@@ -1,13 +1,6 @@
 "use client";
 
-interface PastSpeedTestResult {
-  id: number;
-  location: string;
-  download_speed: number;
-  upload_speed: number;
-  ping: number;
-  timestamp: string;
-}
+import { PastSpeedTestResult } from '../lib/types';
 
 interface PastResultsTableProps {
   pastResults: PastSpeedTestResult[];

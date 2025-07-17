@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     if (typeof ping !== 'number' || ping < 0) {
       return NextResponse.json({ error: 'Invalid ping value' }, { status: 400 });
     }
-    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+    if ((latitude !== null && typeof latitude !== 'number') || (longitude !== null && typeof longitude !== 'number')) {
       return NextResponse.json({ error: 'Invalid coordinates provided' }, { status: 400 });
     }
 
