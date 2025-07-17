@@ -27,13 +27,6 @@ primary_region = 'gru'
     method = 'GET'
     path = '/'
 
-[[services]]
-  protocol = 'tcp'
-  internal_port = 3001
-
-  [[services.ports]]
-    port = 10000
-
 [[vm]]
   cpu_kind = 'shared'
   cpus = 1

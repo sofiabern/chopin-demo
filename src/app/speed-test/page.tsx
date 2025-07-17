@@ -69,6 +69,7 @@ const getIpLocation = async (): Promise<string> => {
 
 export default function SpeedTestPage() {
   const [location, setLocation] = useState('');
+  const [coordinates, setCoordinates] = useState<{ lat: number, lng: number } | null>(null);
   const [speedTestResults, setSpeedTestResults] = useState<SpeedTestResult | null>(null);
   const [isLocationLoading, setIsLocationLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,8 +81,17 @@ export default function SpeedTestPage() {
   const [pastResults, setPastResults] = useState<PastSpeedTestResult[]>([]);
   const [isFetchingPastResults, setIsFetchingPastResults] = useState(false);
   const [chopinAddress, setChopinAddress] = useState<string | null>(null);
+  const [filterLocation, setFilterLocation] = useState('');
+  const [showMyResults, setShowMyResults] = useState(false);
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 10, totalPages: 1, totalResults: 0 });
+  const [filterMode, setFilterMode] = useState<'location' | 'radius'>('location');
+  const [radius, setRadius] = useState<number>(10);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+
+  useEffect(() => {
+    fetchPastResults();
+  }, []);
 
   useEffect(() => {
     const fetchAuthStatus = async () => {
@@ -113,20 +123,22 @@ export default function SpeedTestPage() {
               (pos) => resolve(pos),
               (err) => {
                 console.error('GPS error, falling back to IP location:', err);
-                // Fall back to IP location
-                getIpLocation().then(setLocation).finally(() => resolve(null));
+                resolve(null);
               },
               { timeout: 5000 }
             );
           });
 
           if (position) {
-            // Format location using coordinates
+            setCoordinates({ lat: position.coords.latitude, lng: position.coords.longitude });
             const formattedLocation = await formatLocation(
               position.coords.latitude,
               position.coords.longitude
             );
             setLocation(formattedLocation);
+          } else {
+            const ipLocation = await getIpLocation();
+            setLocation(ipLocation);
           }
         } else {
           // Use IP location if geolocation is not available
@@ -163,12 +175,7 @@ export default function SpeedTestPage() {
         return;
       }
 
-      // Handle pong response
-      if (event.data && event.data.message === 'pong') {
-        console.log('Parent page: Received pong response from widget!');
-        return;
-      }
-
+      // Handle test started message
       if (event.data && event.data.message === 'test_started') {
         console.log('Parent page: Test started message received, updating state.');
         setSpeedTestResults(null);
@@ -195,18 +202,8 @@ export default function SpeedTestPage() {
     };
   }, []);
 
-  const handlePingIframe = () => {
-    if (iframeRef.current && iframeRef.current.contentWindow) {
-      const targetOrigin = SPEED_TEST_CONFIG.server;
-      console.log(`Parent page: Sending 'ping' to iframe with target origin: ${targetOrigin}`);
-      iframeRef.current.contentWindow.postMessage({ message: 'ping' }, targetOrigin);
-    } else {
-      console.error('Parent page: Cannot send ping, iframe not available.');
-    }
-  };
-
   const handleSubmit = async () => {
-    if (!speedTestResults) return;
+    if (!speedTestResults || !coordinates) return;
 
     setIsSubmitting(true);
     setSubmissionMessage(null);
@@ -222,6 +219,8 @@ export default function SpeedTestPage() {
           download_speed: speedTestResults.download,
           upload_speed: speedTestResults.upload,
           ping: speedTestResults.ping,
+          latitude: coordinates.lat,
+          longitude: coordinates.lng
         }),
       });
 
@@ -245,19 +244,35 @@ export default function SpeedTestPage() {
     }
   };
 
-  const fetchPastResults = async () => {
-    if (!location || location === 'Location not available') return;
-
+  const fetchPastResults = async (page = 1) => {
     setIsFetchingPastResults(true);
     setPastResults([]);
     try {
-      const response = await fetch(`/api/speed-test?location=${encodeURIComponent(location)}`);
+      const params = new URLSearchParams({
+        page: page.toString(),
+        pageSize: pagination.pageSize.toString(),
+      });
+
+      if (filterMode === 'location' && filterLocation) {
+        params.append('location', filterLocation);
+      } else if (filterMode === 'radius' && coordinates) {
+        params.append('radius', radius.toString());
+        params.append('latitude', coordinates.lat.toString());
+        params.append('longitude', coordinates.lng.toString());
+      }
+
+      if (showMyResults) {
+        params.append('me', 'true');
+      }
+
+      const response = await fetch(`/api/speed-test?${params.toString()}`);
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch past results');
       }
       setPastResults(data.results);
+      setPagination(data.pagination);
     } catch (err) {
       if (err instanceof Error) {
         setError(`Error fetching past results: ${err.message}`);
@@ -269,14 +284,15 @@ export default function SpeedTestPage() {
     }
   };
 
+  const handleFilterChange = () => {
+    setPagination(prev => ({ ...prev, page: 1 }));
+    fetchPastResults(1);
+  };
+
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold mb-4">WiFi Speed Test</h1>
-        <button onClick={handlePingIframe} className="mb-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-          Ping Iframe (for debugging)
-        </button>
-        <p className="mb-2">Your Chopin wallet address: {chopinAddress ? <span className="font-mono">{chopinAddress}</span> : 'Loading...'}</p>
         {chopinAddress ? (
           <div className="text-right">
             <p className="text-sm text-gray-600">Logged in as:</p>
@@ -289,23 +305,71 @@ export default function SpeedTestPage() {
         )}
       </div>
 
-      <div className="mb-4">
-        <label className="block text-gray-700 text-sm font-bold mb-2">
-          Location:
-        </label>
-        <input
-          type="text"
-          value={isLocationLoading ? 'Determining your location...' : location}
-          className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-          readOnly
-        />
-        <button
-          onClick={fetchPastResults}
-          className="mt-2 bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 transition-colors disabled:bg-gray-300"
-          disabled={isFetchingPastResults || isLocationLoading || !location || location === 'Location not available'}
-        >
-          {isFetchingPastResults ? 'Loading History...' : 'Get Past Results for this Location'}
-        </button>
+      <div className="mb-4 p-4 border rounded-lg bg-gray-50">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+          {/* Current Location */}
+          <div className="flex items-center">
+            <p className="font-bold mr-2">Location:</p>
+            <p className="text-gray-700">{isLocationLoading ? 'Determining...' : location}</p>
+          </div>
+
+          {/* Vertical separator */}
+          <div className="border-l h-6 border-gray-300 self-center"></div>
+
+          {/* Filter controls */}
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-gray-700">Filter by:</p>
+            <select
+              value={filterMode}
+              onChange={(e) => setFilterMode(e.target.value as 'location' | 'radius')}
+              className="shadow-sm border rounded py-1 px-2 text-gray-700 bg-white"
+            >
+              <option value="location">Name</option>
+              <option value="radius">Radius</option>
+            </select>
+
+            {filterMode === 'location' ? (
+              <input
+                type="text"
+                placeholder="e.g., Brazil"
+                value={filterLocation}
+                onChange={(e) => setFilterLocation(e.target.value)}
+                className="shadow-sm appearance-none border rounded w-48 py-1 px-2 text-gray-700"
+              />
+            ) : (
+              <select
+                value={radius}
+                onChange={(e) => setRadius(Number(e.target.value))}
+                className="shadow-sm border rounded py-1 px-2 text-gray-700 bg-white"
+                disabled={!coordinates}
+              >
+                <option value={5}>5 km</option>
+                <option value={25}>25 km</option>
+                <option value={100}>100 km</option>
+                <option value={500}>500 km</option>
+              </select>
+            )}
+          </div>
+          
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showMyResults}
+              onChange={(e) => setShowMyResults(e.target.checked)}
+              className="form-checkbox h-4 w-4 text-purple-600 rounded"
+            />
+            <span className="text-gray-700">My Results</span>
+          </label>
+
+          {/* Search Button */}
+          <button
+            onClick={() => handleFilterChange()}
+            className="bg-purple-500 text-white px-4 py-1.5 rounded hover:bg-purple-600 transition-colors disabled:bg-gray-400"
+            disabled={isFetchingPastResults || (filterMode === 'radius' && !coordinates)}
+          >
+            {isFetchingPastResults ? 'Searching...' : 'Search'}
+          </button>
+        </div>
       </div>
 
       {!speedTestResults && (
@@ -379,12 +443,13 @@ export default function SpeedTestPage() {
 
       {pastResults.length > 0 && (
         <div className="mt-8">
-          <h2 className="text-xl font-bold mb-4">Past Results for {location}</h2>
+          <h2 className="text-xl font-bold mb-4">Past Results</h2>
           <div className="overflow-x-auto">
             <table className="min-w-full bg-white border border-gray-200">
               <thead>
                 <tr className="bg-gray-100">
                   <th className="py-2 px-4 border-b">Timestamp</th>
+                  <th className="py-2 px-4 border-b">Location</th>
                   <th className="py-2 px-4 border-b">Download (Mbps)</th>
                   <th className="py-2 px-4 border-b">Upload (Mbps)</th>
                   <th className="py-2 px-4 border-b">Ping (ms)</th>
@@ -393,7 +458,8 @@ export default function SpeedTestPage() {
               <tbody>
                 {pastResults.map((result) => (
                   <tr key={result.id} className="text-center">
-                    <td className="py-2 px-4 border-b">{new Date(+result.timestamp / 1000).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'medium' })}</td>
+                    <td className="py-2 px-4 border-b">{new Date(result.timestamp).toLocaleString()}</td>
+                    <td className="py-2 px-4 border-b">{result.location}</td>
                     <td className="py-2 px-4 border-b">{result.download_speed.toFixed(2)}</td>
                     <td className="py-2 px-4 border-b">{result.upload_speed.toFixed(2)}</td>
                     <td className="py-2 px-4 border-b">{result.ping.toFixed(1)}</td>
@@ -402,12 +468,31 @@ export default function SpeedTestPage() {
               </tbody>
             </table>
           </div>
+          <div className="mt-4 flex justify-between items-center">
+            <button
+              onClick={() => fetchPastResults(pagination.page - 1)}
+              disabled={pagination.page <= 1 || isFetchingPastResults}
+              className="bg-gray-300 text-gray-700 px-4 py-2 rounded disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <span>
+              Page {pagination.page} of {pagination.totalPages}
+            </span>
+            <button
+              onClick={() => fetchPastResults(pagination.page + 1)}
+              disabled={pagination.page >= pagination.totalPages || isFetchingPastResults}
+              className="bg-gray-300 text-gray-700 px-4 py-2 rounded disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
 
-      {pastResults.length === 0 && !isFetchingPastResults && !isLocationLoading && location !== '' && location !== 'Location not available' && (
+      {pastResults.length === 0 && !isFetchingPastResults && (
         <div className="mt-4">
-          <p>No past results found for this location. Click the button above to check.</p>
+          <p>No past results found for the current filters.</p>
         </div>
       )}
     </div>
