@@ -1,7 +1,11 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useAddress } from '@chopinframework/react';
+import AuthDisplay from './components/AuthDisplay';
+import FilterControls from './components/FilterControls';
+import ResultsDisplay from './components/ResultsDisplay';
+import PastResultsTable from './components/PastResultsTable';
 
 // OpenSpeedTest widget configuration
 const SPEED_TEST_CONFIG = {
@@ -80,7 +84,7 @@ export default function SpeedTestPage() {
   const [isGeolocationAvailable, setIsGeolocationAvailable] = useState(false);
   const [pastResults, setPastResults] = useState<PastSpeedTestResult[]>([]);
   const [isFetchingPastResults, setIsFetchingPastResults] = useState(false);
-  const [chopinAddress, setChopinAddress] = useState<string | null>(null);
+  const { address: chopinAddress } = useAddress();
   const [filterLocation, setFilterLocation] = useState('');
   const [showMyResults, setShowMyResults] = useState(false);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 10, totalPages: 1, totalResults: 0 });
@@ -91,21 +95,6 @@ export default function SpeedTestPage() {
 
   useEffect(() => {
     fetchPastResults();
-  }, []);
-
-  useEffect(() => {
-    const fetchAuthStatus = async () => {
-      try {
-        const response = await fetch('/api/auth/status');
-        const data = await response.json();
-        if (response.ok && data.address) {
-          setChopinAddress(data.address);
-        }
-      } catch (err) {
-        console.error('Failed to fetch auth status:', err);
-      }
-    };
-    fetchAuthStatus();
   }, []);
 
   // Get browser location with fallback
@@ -293,16 +282,7 @@ export default function SpeedTestPage() {
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold mb-4">WiFi Speed Test</h1>
-        {chopinAddress ? (
-          <div className="text-right">
-            <p className="text-sm text-gray-600">Logged in as:</p>
-            <p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">{chopinAddress}</p>
-          </div>
-        ) : (
-          <a href="/_chopin/login" className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors">
-            Login with Chopin
-          </a>
-        )}
+        <AuthDisplay />
       </div>
 
       <div className="mb-4 p-4 border rounded-lg bg-gray-50">
@@ -317,58 +297,19 @@ export default function SpeedTestPage() {
           <div className="border-l h-6 border-gray-300 self-center"></div>
 
           {/* Filter controls */}
-          <div className="flex items-center gap-2">
-            <p className="font-semibold text-gray-700">Filter by:</p>
-            <select
-              value={filterMode}
-              onChange={(e) => setFilterMode(e.target.value as 'location' | 'radius')}
-              className="shadow-sm border rounded py-1 px-2 text-gray-700 bg-white"
-            >
-              <option value="location">Name</option>
-              <option value="radius">Radius</option>
-            </select>
-
-            {filterMode === 'location' ? (
-              <input
-                type="text"
-                placeholder="e.g., Brazil"
-                value={filterLocation}
-                onChange={(e) => setFilterLocation(e.target.value)}
-                className="shadow-sm appearance-none border rounded w-48 py-1 px-2 text-gray-700"
-              />
-            ) : (
-              <select
-                value={radius}
-                onChange={(e) => setRadius(Number(e.target.value))}
-                className="shadow-sm border rounded py-1 px-2 text-gray-700 bg-white"
-                disabled={!coordinates}
-              >
-                <option value={5}>5 km</option>
-                <option value={25}>25 km</option>
-                <option value={100}>100 km</option>
-                <option value={500}>500 km</option>
-              </select>
-            )}
-          </div>
-          
-          <label className="flex items-center space-x-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showMyResults}
-              onChange={(e) => setShowMyResults(e.target.checked)}
-              className="form-checkbox h-4 w-4 text-purple-600 rounded"
-            />
-            <span className="text-gray-700">My Results</span>
-          </label>
-
-          {/* Search Button */}
-          <button
-            onClick={() => handleFilterChange()}
-            className="bg-purple-500 text-white px-4 py-1.5 rounded hover:bg-purple-600 transition-colors disabled:bg-gray-400"
-            disabled={isFetchingPastResults || (filterMode === 'radius' && !coordinates)}
-          >
-            {isFetchingPastResults ? 'Searching...' : 'Search'}
-          </button>
+          <FilterControls
+            filterMode={filterMode}
+            setFilterMode={setFilterMode}
+            filterLocation={filterLocation}
+            setFilterLocation={setFilterLocation}
+            radius={radius}
+            setRadius={setRadius}
+            coordinates={coordinates}
+            showMyResults={showMyResults}
+            setShowMyResults={setShowMyResults}
+            handleFilterChange={handleFilterChange}
+            isFetchingPastResults={isFetchingPastResults}
+          />
         </div>
       </div>
 
@@ -400,39 +341,16 @@ export default function SpeedTestPage() {
       )}
 
       {speedTestResults && (
-        <div className="mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
-          <p>Download Speed: {speedTestResults.download.toFixed(2)} Mbps</p>
-          <p>Upload Speed: {speedTestResults.upload.toFixed(2)} Mbps</p>
-          <p>Ping: {speedTestResults.ping.toFixed(1)} ms</p>
-
-          <div className="mt-4 flex flex-col">
-            <div className="flex gap-4">
-              <button
-                onClick={() => {
-                  setSpeedTestResults(null);
-                  setIsTestRunning(false);
-                  setSubmissionMessage(null);
-                  setIframeKey(Date.now()); // Reload iframe
-                }}
-                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-              >
-                Test Again
-              </button>
-              <button
-                onClick={handleSubmit}
-                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors disabled:bg-gray-300"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Submitting...' : 'Submit Results'}
-              </button>
-            </div>
-            {submissionMessage && (
-              <div className={`mt-2 text-sm ${submissionMessage.startsWith('Error') ? 'text-red-700' : 'text-green-700'}`}>
-                {submissionMessage}
-              </div>
-            )}
-          </div>
-        </div>
+        <ResultsDisplay
+          speedTestResults={speedTestResults}
+          setSpeedTestResults={setSpeedTestResults}
+          setIsTestRunning={setIsTestRunning}
+          setSubmissionMessage={setSubmissionMessage}
+          setIframeKey={setIframeKey}
+          handleSubmit={handleSubmit}
+          isSubmitting={isSubmitting}
+          submissionMessage={submissionMessage}
+        />
       )}
 
       {isFetchingPastResults && (
@@ -442,52 +360,12 @@ export default function SpeedTestPage() {
       )}
 
       {pastResults.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-xl font-bold mb-4">Past Results</h2>
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white border border-gray-200">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="py-2 px-4 border-b">Timestamp</th>
-                  <th className="py-2 px-4 border-b">Location</th>
-                  <th className="py-2 px-4 border-b">Download (Mbps)</th>
-                  <th className="py-2 px-4 border-b">Upload (Mbps)</th>
-                  <th className="py-2 px-4 border-b">Ping (ms)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pastResults.map((result) => (
-                  <tr key={result.id} className="text-center">
-                    <td className="py-2 px-4 border-b">{new Date(result.timestamp).toLocaleString()}</td>
-                    <td className="py-2 px-4 border-b">{result.location}</td>
-                    <td className="py-2 px-4 border-b">{result.download_speed.toFixed(2)}</td>
-                    <td className="py-2 px-4 border-b">{result.upload_speed.toFixed(2)}</td>
-                    <td className="py-2 px-4 border-b">{result.ping.toFixed(1)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-4 flex justify-between items-center">
-            <button
-              onClick={() => fetchPastResults(pagination.page - 1)}
-              disabled={pagination.page <= 1 || isFetchingPastResults}
-              className="bg-gray-300 text-gray-700 px-4 py-2 rounded disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <span>
-              Page {pagination.page} of {pagination.totalPages}
-            </span>
-            <button
-              onClick={() => fetchPastResults(pagination.page + 1)}
-              disabled={pagination.page >= pagination.totalPages || isFetchingPastResults}
-              className="bg-gray-300 text-gray-700 px-4 py-2 rounded disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
-        </div>
+        <PastResultsTable
+          pastResults={pastResults}
+          pagination={pagination}
+          fetchPastResults={fetchPastResults}
+          isFetchingPastResults={isFetchingPastResults}
+        />
       )}
 
       {pastResults.length === 0 && !isFetchingPastResults && (
