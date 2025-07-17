@@ -1,24 +1,25 @@
 # Chopin Demo: Decentralized Speed Test
 
-This project is a demonstration of the Chopin framework, showcasing how to build a decentralized application that allows users to record and query internet speed test results at specific geographic locations. The data is stored in a local SQLite database and is intended to be validated by a Chopin Oracle, leveraging the Celestia blockchain layer.
-
-## Features
-
-- **Speed Test:** Integrates a self-hosted OpenSpeedTest widget to measure download speed, upload speed, and ping.
-- **Geolocation:** Uses the browser's Geolocation API to capture the user's current latitude and longitude.
-- **Data Storage:** Saves speed test results along with location data to a local SQLite database via a Next.js API route.
-- **Frontend:** A responsive Next.js application built with TypeScript and styled with Tailwind CSS.
-- **Backend:** A simple Next.js API route that acts as a Backend-for-Frontend (BFF) to interact with the SQLite database.
+This project is a demonstration of the Chopin framework, showcasing how to build a decentralized application that allows users to record and query internet speed test results. The application integrates a self-hosted OpenSpeedTest widget, captures results via `postMessage` communication, and saves them to a local database.
 
 ## Tech Stack
 
 - **Framework:** [Next.js](https://nextjs.org/)
 - **Language:** [TypeScript](https://www.typescriptlang.org/)
 - **Styling:** [Tailwind CSS](https://tailwindcss.com/)
-- **Speed Test Widget:** [OpenSpeedTest](https://openspeedtest.com/) (self-hosted)
+- **Speed Test Widget:** [OpenSpeedTest](https://openspeedtest.com/) (self-hosted in Docker)
 - **Database:** [SQLite](https://www.sqlite.org/index.html)
+- **Containerization:** [Docker](https://www.docker.com/)
 - **Blockchain (planned):** [Celestia](https://celestia.org/) via Chopin Framework
 - **Validation (planned):** Chopin Oracle
+
+## Features
+
+- **Reliable Speed Tests:** Integrates a self-hosted OpenSpeedTest widget running in a custom Docker container.
+- **Seamless Iframe Communication:** Uses the `postMessage` API for robust communication between the Next.js parent page and the speed test iframe.
+- **Geolocation:** Captures the user's location via the browser's Geolocation API.
+- **Local Data Persistence:** Saves speed test results to a local SQLite database via a Next.js API route.
+- **Custom Docker Image:** Ensures a consistent and reliable environment for the speed test widget by baking in all modifications.
 
 ## Getting Started
 
@@ -33,7 +34,6 @@ Follow these instructions to get the project up and running on your local machin
 ### 1. Clone the Repository
 
 ```bash
-# Clone this repository to your local machine
 git clone <repository-url>
 cd demo
 ```
@@ -46,18 +46,26 @@ Install the necessary Node.js packages for the Next.js application.
 npm install
 ```
 
-### 3. Run the OpenSpeedTest Server
+### 3. Build the Custom Speed Test Image
 
-The speed test widget is served from a self-hosted Docker container. This command will start the container, publish the necessary ports, and mount the local source code. This allows for live modifications to the widget's code without rebuilding the container.
+The OpenSpeedTest widget runs in a custom Docker container with our modifications baked in. Build the image using the provided Dockerfile.
 
 ```bash
-sudo docker run --restart=unless-stopped --name openspeedtest -d -p 8080:3000 -p 8081:3001 -v "$(pwd)/public/openspeedtest-custom/index.html:/var/www/html/index.html" -v "$(pwd)/public/openspeedtest-custom/hosted.html:/var/www/html/hosted.html" openspeedtest/latest
+docker build -f speedtest-server/Dockerfile -t custom-speedtest .
 ```
 
-- The speed test widget will be available at `http://localhost:8080`.
-- The `-v` flags mount the custom `index.html` and `hosted.html` files into the container. This allows you to modify the widget's behavior without rebuilding the Docker image.
+### 4. Run the Speed Test Container
 
-### 4. Run the Next.js Application
+Run the custom Docker container you just built. This will expose the necessary ports for the widget to function.
+
+```bash
+docker run -d --name speedtest-server -p 8080:3000 -p 8443:3001 custom-speedtest
+```
+
+- The speed test widget will now be running and accessible to the Next.js application.
+- To stop the container, run `docker stop speedtest-server`.
+
+### 5. Run the Next.js Application
 
 Start the main application's development server.
 
@@ -70,8 +78,8 @@ npm run dev
 
 ## Project Structure
 
-- `src/app/page.tsx`: The main entry point of the application.
-- `src/app/speed-test/page.tsx`: The main page for the speed test functionality.
-- `src/app/api/speed-test/route.ts`: The API route for saving and retrieving speed test data.
-- `public/openspeedtest-custom/`: Contains the customized HTML files for the self-hosted OpenSpeedTest widget.
-- `speed-tests.db`: The SQLite database file where results are stored (will be created automatically).
+- `src/app/speed-test/page.tsx`: The main page for the speed test functionality, handling UI and iframe communication.
+- `src/app/api/speed-test/route.ts`: The API route for saving and retrieving speed test data from the database.
+- `public/openspeedtest-custom/`: Contains the source code for our modified OpenSpeedTest widget files.
+- `speedtest-server/Dockerfile`: The Dockerfile used to build our custom speed test server image.
+- `speedtest.db`: The SQLite database file where results are stored (created automatically).

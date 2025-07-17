@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server';
 import { Oracle } from '@chopinframework/next';
 import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
+import { open, Database } from 'sqlite';
 
-let db: any = null;
+let db: Database | null = null;
 
 // Initialize SQLite database using a singleton pattern
 const initDB = async () => {
   if (db) return db;
 
   db = await open({
-    filename: './speed-tests.db',
+    filename: '/tmp/speed-tests.db',
     driver: sqlite3.Database
   });
 

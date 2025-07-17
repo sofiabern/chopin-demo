@@ -9,7 +9,7 @@ const SPEED_TEST_CONFIG = {
   height: '600px',
   theme: 'light',
   language: 'en',
-  server: 'http://localhost:8080' // Using self-hosted server
+  server: process.env.NEXT_PUBLIC_SPEEDTEST_SERVER_URL || 'http://localhost:8080' // Using self-hosted server
 };
 
 // Custom event types for OpenSpeedTest
@@ -80,6 +80,7 @@ export default function SpeedTestPage() {
   const [pastResults, setPastResults] = useState<PastSpeedTestResult[]>([]);
   const [isFetchingPastResults, setIsFetchingPastResults] = useState(false);
   const [chopinAddress, setChopinAddress] = useState<string | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
 
   useEffect(() => {
@@ -145,17 +146,38 @@ export default function SpeedTestPage() {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-            if (event.origin !== new URL(SPEED_TEST_CONFIG.server).origin) {
+      // Log every message that comes through for debugging
+      console.log('Parent page: Received message:', {
+        origin: event.origin,
+        data: event.data,
+      });
+
+      // Check origin for security (simplified for direct index.html communication)
+      const expectedOrigin = new URL(SPEED_TEST_CONFIG.server).origin;
+      const isValidOrigin = event.origin === expectedOrigin || 
+                           event.origin === 'http://localhost:8080' || 
+                           event.origin === 'http://127.0.0.1:8080';
+      
+      if (!isValidOrigin) {
+        console.warn(`Parent page: Ignored message from unexpected origin: ${event.origin}, expected: ${expectedOrigin}`);
+        return;
+      }
+
+      // Handle pong response
+      if (event.data && event.data.message === 'pong') {
+        console.log('Parent page: Received pong response from widget!');
         return;
       }
 
       if (event.data && event.data.message === 'test_started') {
+        console.log('Parent page: Test started message received, updating state.');
         setSpeedTestResults(null);
         setError(null);
         setIsTestRunning(true);
       }
 
       if (event.data && event.data.message === 'test_completed') {
+        console.log('Parent page: Test completed message received, updating state.');
         const results = event.data.results;
         setSpeedTestResults({
           download: parseFloat(results.download),
@@ -172,6 +194,16 @@ export default function SpeedTestPage() {
       window.removeEventListener('message', handleMessage);
     };
   }, []);
+
+  const handlePingIframe = () => {
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      const targetOrigin = SPEED_TEST_CONFIG.server;
+      console.log(`Parent page: Sending 'ping' to iframe with target origin: ${targetOrigin}`);
+      iframeRef.current.contentWindow.postMessage({ message: 'ping' }, targetOrigin);
+    } else {
+      console.error('Parent page: Cannot send ping, iframe not available.');
+    }
+  };
 
   const handleSubmit = async () => {
     if (!speedTestResults) return;
@@ -202,8 +234,12 @@ export default function SpeedTestPage() {
       setSubmissionMessage('Results submitted successfully!');
       // Automatically refresh the past results list
       await fetchPastResults();
-    } catch (err: any) {
-      setSubmissionMessage(`Error: ${err.message}`);
+    } catch (err) {
+      if (err instanceof Error) {
+        setSubmissionMessage(`Error: ${err.message}`);
+      } else {
+        setSubmissionMessage('An unknown error occurred during submission.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -223,8 +259,12 @@ export default function SpeedTestPage() {
       }
 
       setPastResults(data.results);
-    } catch (err: any) {
-      setError(`Error fetching past results: ${err.message}`);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(`Error fetching past results: ${err.message}`);
+      } else {
+        setError('An unknown error occurred while fetching past results.');
+      }
     } finally {
       setIsFetchingPastResults(false);
     }
@@ -233,19 +273,21 @@ export default function SpeedTestPage() {
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Speed Test</h1>
-        <div>
-          {chopinAddress ? (
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Logged in as:</p>
-              <p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">{chopinAddress}</p>
-            </div>
-          ) : (
-            <a href="/_chopin/login" className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors">
-              Login with Chopin
-            </a>
-          )}
-        </div>
+        <h1 className="text-2xl font-bold mb-4">WiFi Speed Test</h1>
+        <button onClick={handlePingIframe} className="mb-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+          Ping Iframe (for debugging)
+        </button>
+        <p className="mb-2">Your Chopin wallet address: {chopinAddress ? <span className="font-mono">{chopinAddress}</span> : 'Loading...'}</p>
+        {chopinAddress ? (
+          <div className="text-right">
+            <p className="text-sm text-gray-600">Logged in as:</p>
+            <p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">{chopinAddress}</p>
+          </div>
+        ) : (
+          <a href="/_chopin/login" className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors">
+            Login with Chopin
+          </a>
+        )}
       </div>
 
       <div className="mb-4">
@@ -271,7 +313,8 @@ export default function SpeedTestPage() {
         <div className="mt-4">
           <iframe
             key={iframeKey}
-            src={SPEED_TEST_CONFIG.server}
+            ref={iframeRef}
+            src={`${SPEED_TEST_CONFIG.server}/index.html`}
             width={SPEED_TEST_CONFIG.width}
             height={SPEED_TEST_CONFIG.height}
             frameBorder="0"
