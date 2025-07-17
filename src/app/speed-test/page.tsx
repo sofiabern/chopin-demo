@@ -45,7 +45,7 @@ const formatLocation = async (lat: number, lng: number): Promise<string> => {
   try {
     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
     const data = await response.json();
-    
+
     // Format as City, Region, Country
     const components = data.address;
     return `${components.city || components.town || components.village || 'Unknown'}, ${components.state || components.county || 'Unknown'}, ${components.country}`;
@@ -106,7 +106,7 @@ export default function SpeedTestPage() {
         // Check if geolocation is available
         if (navigator.geolocation) {
           setIsGeolocationAvailable(true);
-          
+
           // Try to get GPS location first
           const position = await new Promise<GeolocationPosition | null>((resolve) => {
             navigator.geolocation.getCurrentPosition(
@@ -154,10 +154,10 @@ export default function SpeedTestPage() {
 
       // Check origin for security (simplified for direct index.html communication)
       const expectedOrigin = new URL(SPEED_TEST_CONFIG.server).origin;
-      const isValidOrigin = event.origin === expectedOrigin || 
-                           event.origin === 'http://localhost:8080' || 
-                           event.origin === 'http://127.0.0.1:8080';
-      
+      const isValidOrigin = event.origin === expectedOrigin ||
+        event.origin === 'http://localhost:8080' ||
+        event.origin === 'http://127.0.0.1:8080';
+
       if (!isValidOrigin) {
         console.warn(`Parent page: Ignored message from unexpected origin: ${event.origin}, expected: ${expectedOrigin}`);
         return;
@@ -212,7 +212,7 @@ export default function SpeedTestPage() {
     setSubmissionMessage(null);
 
     try {
-            const response = await fetch('/api/speed-test', {
+      const response = await fetch('/api/speed-test', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -257,7 +257,6 @@ export default function SpeedTestPage() {
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch past results');
       }
-
       setPastResults(data.results);
     } catch (err) {
       if (err instanceof Error) {
@@ -394,7 +393,7 @@ export default function SpeedTestPage() {
               <tbody>
                 {pastResults.map((result) => (
                   <tr key={result.id} className="text-center">
-                    <td className="py-2 px-4 border-b">{new Date(result.timestamp + 'Z').toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'medium' })}</td>
+                    <td className="py-2 px-4 border-b">{new Date(+result.timestamp / 1000).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'medium' })}</td>
                     <td className="py-2 px-4 border-b">{result.download_speed.toFixed(2)}</td>
                     <td className="py-2 px-4 border-b">{result.upload_speed.toFixed(2)}</td>
                     <td className="py-2 px-4 border-b">{result.ping.toFixed(1)}</td>
