@@ -1,6 +1,6 @@
 "use client";
 
-import { SpeedTestResult } from '../lib/types';
+import { SpeedTestResult } from '../../lib/types';
 
 interface ResultsDisplayProps {
   speedTestResults: SpeedTestResult;
@@ -24,13 +24,13 @@ export default function ResultsDisplay({
   submissionMessage
 }: ResultsDisplayProps) {
   return (
-    <div className="mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+    <div className="results-display-container">
       <p>Download Speed: {speedTestResults.download.toFixed(2)} Mbps</p>
       <p>Upload Speed: {speedTestResults.upload.toFixed(2)} Mbps</p>
       <p>Ping: {speedTestResults.ping.toFixed(1)} ms</p>
 
-      <div className="mt-4 flex flex-col">
-        <div className="flex gap-4">
+      <div className="buttons-container">
+        <div className="buttons-row">
           <button
             onClick={() => {
               setSpeedTestResults(null);
@@ -38,20 +38,20 @@ export default function ResultsDisplay({
               setSubmissionMessage(null);
               setIframeKey(Date.now()); // Reload iframe
             }}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
+            className="btn btn-primary"
           >
             Test Again
           </button>
           <button
             onClick={handleSubmit}
-            className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors disabled:bg-gray-300"
+            className="btn btn-secondary"
             disabled={isSubmitting}
           >
             {isSubmitting ? 'Submitting...' : 'Submit Results'}
           </button>
         </div>
         {submissionMessage && (
-          <div className={`mt-2 text-sm ${submissionMessage.startsWith('Error') ? 'text-red-700' : 'text-green-700'}`}>
+          <div className={`submission-message ${submissionMessage.startsWith('Error') ? 'submission-error' : 'submission-success'}`}>
             {submissionMessage}
           </div>
         )}

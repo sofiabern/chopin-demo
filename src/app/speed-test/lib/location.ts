@@ -1,3 +1,25 @@
+import { useState, useEffect } from 'react';
+
+export const useLocation = () => {
+  const [location, setLocation] = useState('');
+  const [coordinates, setCoordinates] = useState<{ lat: number, lng: number } | null>(null);
+  const [isLocationLoading, setIsLocationLoading] = useState(true);
+
+  useEffect(() => {
+    const getLocation = async () => {
+      setIsLocationLoading(true);
+      const { location, coordinates } = await fetchAndFormatLocation();
+      setLocation(location);
+      setCoordinates(coordinates);
+      setIsLocationLoading(false);
+    };
+
+    getLocation();
+  }, []);
+
+  return { location, coordinates, isLocationLoading };
+};
+
 export const formatLocation = async (lat: number, lng: number): Promise<string> => {
   try {
     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
@@ -25,13 +47,11 @@ export const getIpLocation = async (): Promise<{ location: string, coordinates: 
   }
 };
 
-export const fetchAndFormatLocation = async (): Promise<{ location: string, coordinates: { lat: number, lng: number } | null, isGeolocationAvailable: boolean }> => {
+export const fetchAndFormatLocation = async (): Promise<{ location: string, coordinates: { lat: number, lng: number } | null }> => {
   let location = 'Location not available';
   let coordinates: { lat: number, lng: number } | null = null;
-  let isGeolocationAvailable = false;
 
   if (typeof window !== 'undefined' && navigator.geolocation) {
-    isGeolocationAvailable = true;
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
@@ -43,17 +63,15 @@ export const fetchAndFormatLocation = async (): Promise<{ location: string, coor
       }
     } catch (err) {
       console.error('GPS error, falling back to IP location:', err);
-      // Fallback to IP location if Geolocation fails
       const ipLocationData = await getIpLocation();
       location = ipLocationData.location;
       coordinates = ipLocationData.coordinates;
     }
   } else {
-    // Geolocation is not available, use IP location as the primary method
     const ipLocationData = await getIpLocation();
     location = ipLocationData.location;
     coordinates = ipLocationData.coordinates;
   }
 
-  return { location, coordinates, isGeolocationAvailable };
+  return { location, coordinates };
 }; 

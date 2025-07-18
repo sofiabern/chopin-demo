@@ -6,16 +6,16 @@ export default function AuthDisplay() {
   const { address: chopinAddress, login } = useAddress();
 
   return (
-    <div>
+    <div className="auth-display">
       {chopinAddress ? (
-        <div className="text-right">
-          <p className="text-sm text-gray-600">Logged in as:</p>
-          <p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">{chopinAddress}</p>
+        <div className="logged-in-container">
+          <p className="logged-in-label">Logged in as:</p>
+          <p className="address-display">{chopinAddress}</p>
         </div>
       ) : (
         <button
           onClick={login}
-          className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors"
+          className="btn btn-green"
         >
           Login with Chopin
         </button>
