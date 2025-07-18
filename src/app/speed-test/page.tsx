@@ -25,7 +25,7 @@ export default function SpeedTestPage() {
   const [isGeolocationAvailable, setIsGeolocationAvailable] = useState(false);
   const [pastResults, setPastResults] = useState<PastSpeedTestResult[]>([]);
   const [isFetchingPastResults, setIsFetchingPastResults] = useState(false);
-  const { address: chopinAddress } = useAddress();
+  const { address: chopinAddress, login } = useAddress();
   const [filterLocation, setFilterLocation] = useState('');
   const [showMyResults, setShowMyResults] = useState(false);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 10, totalPages: 1, totalResults: 0 });
@@ -180,52 +180,67 @@ export default function SpeedTestPage() {
         </div>
       </div>
 
-      {!speedTestResults && (
-        <div className="mt-4">
-          <div style={{ position: 'relative', width: '100%', paddingTop: `${aspectRatio * 100}%` }}>
-            <iframe
-              key={iframeKey}
-              ref={iframeRef}
-              src={`${SPEED_TEST_CONFIG.server}/index.html`}
-              frameBorder="0"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                transformOrigin: 'top left',
-              }}
-              className="w-full h-full"
-              title="OpenSpeedTest"
-            ></iframe>
-          </div>
+      {!chopinAddress ? (
+        <div className="text-center mt-8 p-8 border rounded-lg bg-gray-50">
+          <h2 className="text-xl font-semibold mb-4">Please Log In to Continue</h2>
+          <p className="text-gray-600 mb-6">You need to connect your Chopin wallet to perform a speed test.</p>
+          <button
+            onClick={login}
+            className="bg-green-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors shadow-md"
+          >
+            Login with Chopin
+          </button>
         </div>
-      )}
+      ) : (
+        <>
+          {!speedTestResults && (
+            <div className="mt-4">
+              <div style={{ position: 'relative', width: '100%', paddingTop: `${aspectRatio * 100}%` }}>
+                <iframe
+                  key={iframeKey}
+                  ref={iframeRef}
+                  src={`${SPEED_TEST_CONFIG.server}/index.html`}
+                  frameBorder="0"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    transformOrigin: 'top left',
+                  }}
+                  className="w-full h-full"
+                  title="OpenSpeedTest"
+                ></iframe>
+              </div>
+            </div>
+          )}
 
-      {error && (
-        <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-          {error}
-        </div>
-      )}
+          {error && (
+            <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+              {error}
+            </div>
+          )}
 
-      {isTestRunning && (
-        <div className="mt-4 p-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
-          <p>Test in progress, waiting for results...</p>
-        </div>
-      )}
+          {isTestRunning && (
+            <div className="mt-4 p-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
+              <p>Test in progress, waiting for results...</p>
+            </div>
+          )}
 
-      {speedTestResults && (
-        <ResultsDisplay
-          speedTestResults={speedTestResults}
-          setSpeedTestResults={setSpeedTestResults}
-          setIsTestRunning={setIsTestRunning}
-          setSubmissionMessage={setSubmissionMessage}
-          setIframeKey={setIframeKey}
-          handleSubmit={handleSubmit}
-          isSubmitting={isSubmitting}
-          submissionMessage={submissionMessage}
-        />
+          {speedTestResults && (
+            <ResultsDisplay
+              speedTestResults={speedTestResults}
+              setSpeedTestResults={setSpeedTestResults}
+              setIsTestRunning={setIsTestRunning}
+              setSubmissionMessage={setSubmissionMessage}
+              setIframeKey={setIframeKey}
+              handleSubmit={handleSubmit}
+              isSubmitting={isSubmitting}
+              submissionMessage={submissionMessage}
+            />
+          )}
+        </>
       )}
 
       {isFetchingPastResults && (

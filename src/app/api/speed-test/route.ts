@@ -23,9 +23,11 @@ const initDB = async () => {
       upload_speed REAL NOT NULL,
       ping REAL NOT NULL,
       timestamp DATETIME NOT NULL,
+      submission_minute TEXT NOT NULL,
       address TEXT NOT NULL,
-      latitude REAL NOT NULL,
-      longitude REAL NOT NULL
+      latitude REAL,
+      longitude REAL,
+      UNIQUE(address, submission_minute, download_speed, upload_speed, ping)
     )
   `);
 
@@ -41,6 +43,7 @@ interface SpeedTestResult {
   address: string;
   latitude: number;
   longitude: number;
+  submission_minute: string;
 }
 
 // POST endpoint for registering new speed test results
@@ -75,11 +78,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid coordinates provided' }, { status: 400 });
     }
 
+    // Create a timestamp truncated to the minute for the uniqueness check
+    const submission_minute = new Date().toISOString().slice(0, 16);
+
     const notarizedResult = (await Oracle.notarize(async () => {
       // This block runs inside the Chopin Oracle
       // It receives the client-side data and prepares it for notarization
       const timestamp = await Oracle.now();
-      return { location, download_speed, upload_speed, ping, timestamp, address, latitude, longitude };
+      return { location, download_speed, upload_speed, ping, timestamp, address, latitude, longitude, submission_minute };
     })) as SpeedTestResult;
 
     // The notarized data is the direct result of the notarize function
@@ -91,13 +97,22 @@ export async function POST(request: Request) {
       timestamp: notarizedTimestamp,
       address: notarizedAddress,
       latitude: notarizedLatitude,
-      longitude: notarizedLongitude
+      longitude: notarizedLongitude,
+      submission_minute: notarizedSubmissionMinute,
     } = notarizedResult;
 
-    await db.run(
-      'INSERT INTO speed_tests (location, download_speed, upload_speed, ping, timestamp, address, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [notarizedLocation.trim(), notarizedDownload, notarizedUpload, notarizedPing, new Date(notarizedTimestamp * 1000), notarizedAddress, notarizedLatitude, notarizedLongitude]
-    );
+    try {
+      await db.run(
+        'INSERT INTO speed_tests (location, download_speed, upload_speed, ping, timestamp, submission_minute, address, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [notarizedLocation.trim(), notarizedDownload, notarizedUpload, notarizedPing, new Date(notarizedTimestamp * 1000), notarizedSubmissionMinute, notarizedAddress, notarizedLatitude, notarizedLongitude]
+      );
+    } catch (dbError: any) {
+      if (dbError.code === 'SQLITE_CONSTRAINT') {
+        return NextResponse.json({ error: 'This result has already been submitted.' }, { status: 409 });
+      }
+      throw dbError; // Re-throw other errors
+    }
+
 
     return NextResponse.json({ success: true });
   } catch (error) {
