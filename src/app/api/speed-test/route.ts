@@ -46,6 +46,10 @@ interface SpeedTestResult {
   submission_minute: string;
 }
 
+const isSqliteError = (error: unknown): error is { code: string } => {
+  return typeof error === 'object' && error !== null && 'code' in error;
+};
+
 // POST endpoint for registering new speed test results
 export async function POST(request: Request) {
   try {
@@ -54,7 +58,7 @@ export async function POST(request: Request) {
     let address;
     try {
       address = await getAddress();
-    } catch (e) {
+    } catch (_) {
       return NextResponse.json({ error: 'Unauthorized: could not get address' }, { status: 401 });
     }
     if (!address) {
@@ -106,8 +110,8 @@ export async function POST(request: Request) {
         'INSERT INTO speed_tests (location, download_speed, upload_speed, ping, timestamp, submission_minute, address, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [notarizedLocation.trim(), notarizedDownload, notarizedUpload, notarizedPing, new Date(notarizedTimestamp * 1000), notarizedSubmissionMinute, notarizedAddress, notarizedLatitude, notarizedLongitude]
       );
-    } catch (dbError: any) {
-      if (dbError.code === 'SQLITE_CONSTRAINT') {
+    } catch (dbError) {
+      if (isSqliteError(dbError) && dbError.code === 'SQLITE_CONSTRAINT') {
         return NextResponse.json({ error: 'This result has already been submitted.' }, { status: 409 });
       }
       throw dbError; // Re-throw other errors
@@ -162,7 +166,7 @@ export async function GET(request: Request) {
       let address;
       try {
         address = await getAddress();
-      } catch (e) {
+      } catch (_) {
         return NextResponse.json({ error: 'Unauthorized: could not get address' }, { status: 401 });
       }
 
