@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import FilterControls from './FilterControls';
 import PastResultsTable from './PastResultsTable';
 import { PastSpeedTestResult } from '../../lib/types';
@@ -19,11 +19,7 @@ export default function PastResultsSection({ coordinates }: PastResultsSectionPr
     const [filterMode, setFilterMode] = useState<'location' | 'radius'>('location');
     const [radius, setRadius] = useState<number>(10);
 
-    useEffect(() => {
-        fetchPastResults();
-    }, []);
-
-    const fetchPastResults = async (page = 1) => {
+    const fetchPastResults = useCallback(async (page = 1) => {
         setIsFetchingPastResults(true);
         setPastResults([]);
         setError(null);
@@ -62,7 +58,11 @@ export default function PastResultsSection({ coordinates }: PastResultsSectionPr
         } finally {
             setIsFetchingPastResults(false);
         }
-    };
+    }, [filterMode, filterLocation, coordinates, radius, showMyResults, pagination.pageSize]);
+
+    useEffect(() => {
+        fetchPastResults(1);
+    }, [fetchPastResults]);
 
     const handleFilterChange = () => {
         setPagination(prev => ({ ...prev, page: 1 }));

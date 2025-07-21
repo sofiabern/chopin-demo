@@ -8,6 +8,17 @@ import {
   haversineDistance
 } from '../../../lib/database';
 
+// ============== TYPES ==============
+
+interface SpeedTestRequestBody {
+  location: string;
+  download_speed: number;
+  upload_speed: number;
+  ping: number;
+  latitude: number | null;
+  longitude: number | null;
+}
+
 // ============== UTILITY FUNCTIONS ==============
 
 const validateAndGetAddress = async () => {
@@ -17,12 +28,12 @@ const validateAndGetAddress = async () => {
       throw new Error('Unauthorized: no address');
     }
     return address;
-  } catch (_) {
+  } catch {
     throw new Error('Unauthorized: could not get address');
   }
 };
 
-const validatePostInput = (body: any) => {
+const validatePostInput = (body: SpeedTestRequestBody) => {
   const { location, download_speed, upload_speed, ping, latitude, longitude } = body;
   if (!location || typeof location !== 'string' || location.trim() === '') {
     throw new Error('Invalid location provided');
@@ -111,7 +122,7 @@ export async function GET(request: Request) {
         } else {
           return NextResponse.json({ results: [], pagination: { page, pageSize, totalResults: 0, totalPages: 0 } });
         }
-      } catch (_) {
+      } catch {
         return NextResponse.json({ error: 'Unauthorized: could not get address' }, { status: 401 });
       }
     }
