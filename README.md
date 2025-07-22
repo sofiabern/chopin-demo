@@ -6,24 +6,57 @@ The application allows users to measure their internet speed, notarize the resul
 
 ## How it Works: Core Concepts
 
-This demo illustrates a complete end-to-end flow, from user interaction on the frontend to data notarization and storage on the backend.
+This demo illustrates a complete end-to-end flow designed to showcase the essential Chopin framework concepts in the clearest way possible.
 
-1.  **Wallet Authentication (Frontend)**: A user connects their wallet using the `useAddress` hook from `@chopinframework/react` in our Next.js frontend. This provides a secure, blockchain-native identity.
+### 1. Wallet Authentication (Frontend)
+Located in `src/app/speed-test/components/AuthDisplay.tsx`, this component demonstrates the simplicity of Chopin authentication:
+```typescript
+const { address: chopinAddress, login } = useAddress();
+```
+Just one line gives you a secure, blockchain-native identity. No email/password forms, no session management complexity.
 
-2.  **Speed Measurement (Iframe)**: The user runs a speed test using a self-hosted OpenSpeedTest widget running inside a Docker container. The widget communicates the results back to the Next.js application via the `postMessage` API.
+### 2. Automatic Session Management (Middleware)
+The `src/middleware.ts` file shows Chopin's "invisible" power:
+```typescript
+export { middleware } from "@chopinframework/next";
+```
+This single line automatically handles wallet sessions across your entire Next.js application.
 
-3.  **Data Notarization (Backend)**: The results are sent to a Next.js API route. Here, the backend uses the `Oracle.notarize()` function from `@chopinframework/next`. This powerful feature sends the data to a trusted execution environment (the Chopin Oracle) which cryptographically signs the data and posts a commitment to the Celestia blockchain, returning a trustworthy, tamper-proof result.
+### 3. Speed Measurement (Iframe)
+The user runs a speed test using a self-hosted OpenSpeedTest widget. The widget communicates results back via the `postMessage` API, demonstrating how to integrate external tools into a dApp.
 
-4.  **Data Storage (Database)**: The notarized result, along with the user's address and other metadata, is saved to a local SQLite database for easy querying and display. For a production application, this would be replaced by a cloud-based database.
+### 4. Data Notarization (Backend)
+In `src/app/api/speed-test/route.ts`, two key Chopin functions work together:
+```typescript
+const address = await getAddress(); // Get authenticated user's wallet address
+const notarizedResult = await Oracle.notarize(async () => {
+  const timestamp = await Oracle.now();
+  return { location, download_speed, upload_speed, ping, timestamp, address, ... };
+});
+```
+The `Oracle.notarize()` function sends data to a trusted execution environment that cryptographically signs it and posts a commitment to the Celestia blockchain, creating tamper-proof evidence.
+
+### 5. Data Storage (Database)
+The notarized result is saved to a local SQLite database, but now it's not just data—it's **proof**. Anyone can verify its authenticity using the blockchain record.
 
 ## Key Features
 
-- **Chopin Wallet Integration**: Securely authenticate users and get their wallet address on both the client and server using `@chopinframework/react` and `@chopinframework/next`.
-- **Chopin Oracle Notarization**: Make data tamper-proof by notarizing it on the Celestia blockchain.
-- **Responsive Speed Test Widget**: A self-hosted OpenSpeedTest widget in a custom Docker container, styled to be fully responsive and embeddable.
-- **Robust Iframe Communication**: A clean implementation of the `postMessage` API for seamless communication between the parent app and the iframe.
-- **Geolocation with IP Fallback**: Captures the user's location via the browser's Geolocation API, with a reliable fallback to an IP-based lookup service.
-- **Duplicate Submission Prevention**: Prevents users from submitting the same result multiple times in rapid succession.
+### Core Chopin Framework Showcase
+- **Simplified Wallet Integration**: The `AuthDisplay.tsx` component demonstrates wallet authentication in just 25 lines of code using the `useAddress` hook.
+- **Invisible Middleware**: A single-line middleware configuration enables automatic session management across the entire application.
+- **Oracle Notarization**: Clean, focused example of `Oracle.notarize()` creating blockchain-verified proof from everyday data.
+- **Server-side Identity**: Seamless access to authenticated wallet addresses in API routes using `getAddress()`.
+
+### Educational Architecture
+- **Component Separation**: Each Chopin concept is isolated in its own component for easy demonstration and understanding.
+- **Clear Code Organization**: Business logic, UI components, and API routes are cleanly separated for presentation clarity.
+- **Minimal Dependencies**: Focus on Chopin framework concepts without unnecessary complexity.
+
+### Supporting Features
+- **Self-hosted Speed Test Widget**: Custom Docker container with responsive design and `postMessage` integration.
+- **Geolocation with IP Fallback**: Demonstrates real-world data collection for blockchain verification.
+- **Robust Error Handling**: Proper error states and user feedback throughout the application flow.
+- **Local Development Environment**: Complete local setup that mirrors production behavior for reliable development.
 
 ## Production Architecture
 
@@ -121,9 +154,42 @@ npx chopd
 
 ## Project Structure for Learning
 
-- `src/app/speed-test/page.tsx`: The main frontend component. This is a great place to see how `@chopinframework/react` is used for authentication (`useAddress`).
-- `src/app/api/speed-test/route.ts`: The backend API route. This file demonstrates how to use the `@chopinframework/next` package to get a user's address on the server and notarize data with `Oracle.notarize`.
-- `src/app/speed-test/(components|lib)/`: These directories showcase a clean, modular structure for a Next.js application, separating reusable UI components and business logic.
-- `public/openspeedtest-custom/`: Contains the modified source files for the OpenSpeedTest widget. We've customized the JavaScript to send `postMessage` events and added custom CSS to make it embeddable.
-- `speedtest-server/Dockerfile`: The Dockerfile used to build our custom, self-contained speed test server image.
-- `/tmp/speed-tests.db`: A temporary SQLite database file created automatically for local development. This file is not committed to the repository.
+This project has been organized to clearly highlight the core Chopin framework concepts and make them easy to understand and present. Each component focuses on a specific aspect of decentralized application development.
+
+### Core Chopin Framework Integration
+
+- **`src/middleware.ts`**: The minimal Chopin middleware configuration that enables automatic wallet session management across your entire Next.js application.
+- **`src/app/speed-test/components/AuthDisplay.tsx`**: The cleanest example of Chopin wallet authentication using the `useAddress` hook. This 25-line component demonstrates how simple blockchain-native identity can be.
+- **`src/app/api/speed-test/route.ts`**: The backend API route showcasing the two key server-side Chopin features:
+  - `getAddress()` - Access the authenticated user's wallet address
+  - `Oracle.notarize()` - Create tamper-proof, blockchain-verified data
+
+### Component Architecture
+
+- **`src/app/speed-test/page.tsx`**: The main page component, simplified to show the clean integration of authentication and the main application flow.
+- **`src/app/speed-test/components/SpeedTestView.tsx`**: The main application logic, demonstrating how to use the `useAddress` hook for conditional rendering and user experience.
+- **`src/app/speed-test/components/SpeedTestRunner/`**: Contains the speed test execution logic and results display, separated for clarity.
+- **`src/app/speed-test/components/PastResultsSection/`**: Handles querying and displaying historical results, showcasing how to work with notarized data.
+
+### Business Logic and Utilities
+
+- **`src/app/speed-test/lib/`**: Contains focused utility modules:
+  - `api.ts` - Client-side API communication
+  - `location.ts` - Geolocation handling with IP fallback
+  - `iframe.ts` - PostMessage communication with the speed test widget
+  - `types.ts` - TypeScript definitions
+  - `config.ts` - Application configuration
+
+### Database and Infrastructure
+
+- **`src/lib/database.ts`**: SQLite database operations for local development and data persistence.
+- **`public/openspeedtest-custom/`**: Modified OpenSpeedTest widget files with custom styling and postMessage integration.
+- **`speedtest-server/Dockerfile`**: Docker configuration for the self-hosted speed test server.
+
+### Key Files for Presentations
+
+When demonstrating this application, focus on these files in order:
+1. **`AuthDisplay.tsx`** - Shows how simple wallet authentication is with Chopin
+2. **`route.ts` (lines 87-91)** - The `Oracle.notarize()` call that creates blockchain proof
+3. **`middleware.ts`** - How Chopin integrates seamlessly with Next.js
+4. **`SpeedTestView.tsx`** - Real-world usage of `useAddress` for user experience

@@ -1,5 +1,7 @@
 import sqlite3 from 'sqlite3';
 import { open, Database } from 'sqlite';
+import path from 'path';
+import fs from 'fs';
 
 let db: Database | null = null;
 
@@ -14,6 +16,7 @@ export interface SpeedTestPayload {
   latitude: number | null;
   longitude: number | null;
   submission_minute: string;
+  submission_id: string;
 }
 
 // The result structure when retrieved from the DB
@@ -25,29 +28,52 @@ export const isSqliteError = (error: unknown): error is { code: string } => {
   return typeof error === 'object' && error !== null && 'code' in error;
 };
 
-// Initialize SQLite database using a singleton pattern
+const SEED_DB_PATH = path.join(process.cwd(), 'src', 'lib', 'seed.db');
+const RUNTIME_DB_PATH = '/tmp/speed-tests.db';
+
+// Initialize SQLite database using a copy-on-write strategy for Vercel
 export const initDB = async () => {
   if (db) return db;
+  
+  // When seeding, we connect directly to the seed path to create the file.
+  if (process.env.IS_SEEDING) {
+    db = await open({
+      filename: SEED_DB_PATH,
+      driver: sqlite3.Database
+    });
+  } else {
+    // In a serverless environment, copy the seed DB to a writable location on first run.
+    if (process.env.VERCEL && fs.existsSync(SEED_DB_PATH) && !fs.existsSync(RUNTIME_DB_PATH)) {
+      const seedData = fs.readFileSync(SEED_DB_PATH);
+      fs.writeFileSync(RUNTIME_DB_PATH, seedData);
+    }
 
-  db = await open({
-    filename: '/tmp/speed-tests.db',
-    driver: sqlite3.Database
-  });
+    const dbPath = process.env.VERCEL ? RUNTIME_DB_PATH : SEED_DB_PATH;
 
-  // Create table if it doesn't exist
+    db = await open({
+      filename: dbPath,
+      driver: sqlite3.Database
+    });
+  }
+
+
+  await db.exec(`
+    PRAGMA journal_mode = WAL;
+  `);
+
+  // Create table if it doesn't exist (useful for local dev without seeding)
   await db.exec(`
     CREATE TABLE IF NOT EXISTS speed_tests (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      submission_id TEXT NOT NULL UNIQUE,
       location TEXT NOT NULL,
       download_speed REAL NOT NULL,
       upload_speed REAL NOT NULL,
       ping REAL NOT NULL,
       timestamp DATETIME NOT NULL,
-      submission_minute TEXT NOT NULL,
       address TEXT NOT NULL,
       latitude REAL,
-      longitude REAL,
-      UNIQUE(address, submission_minute, download_speed, upload_speed, ping)
+      longitude REAL
     )
   `);
 
@@ -57,20 +83,20 @@ export const initDB = async () => {
 export const insertSpeedTest = async (result: SpeedTestPayload) => {
   const db = await initDB();
   const { 
+    submission_id,
     location, 
     download_speed, 
     upload_speed, 
     ping, 
     timestamp, 
-    submission_minute, 
     address, 
     latitude, 
     longitude 
   } = result;
 
   await db.run(
-    'INSERT INTO speed_tests (location, download_speed, upload_speed, ping, timestamp, submission_minute, address, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [location.trim(), download_speed, upload_speed, ping, new Date(timestamp * 1000), submission_minute, address, latitude, longitude]
+    'INSERT INTO speed_tests (submission_id, location, download_speed, upload_speed, ping, timestamp, address, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [submission_id, location.trim(), download_speed, upload_speed, ping, new Date(timestamp), address, latitude, longitude]
   );
 };
 

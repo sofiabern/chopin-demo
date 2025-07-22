@@ -42,7 +42,16 @@ export default function PastResultsSection({ coordinates }: PastResultsSectionPr
             }
 
             const response = await fetch(`/api/speed-test?${params.toString()}`);
-            const data = await response.json();
+            
+            // Handle empty or invalid JSON responses
+            let data;
+            try {
+                const text = await response.text();
+                data = text ? JSON.parse(text) : { results: [], pagination: { page: 1, pageSize: 10, totalResults: 0, totalPages: 0 } };
+            } catch (jsonError) {
+                console.error('Error parsing JSON response:', jsonError);
+                throw new Error('Invalid response from server');
+            }
 
             if (!response.ok) {
                 throw new Error(data.error || 'Failed to fetch past results');

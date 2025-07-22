@@ -17,6 +17,7 @@ interface SpeedTestRequestBody {
   ping: number;
   latitude: number | null;
   longitude: number | null;
+  submission_id: string;
 }
 
 // ============== UTILITY FUNCTIONS ==============
@@ -34,7 +35,7 @@ const validateAndGetAddress = async () => {
 };
 
 const validatePostInput = (body: SpeedTestRequestBody) => {
-  const { location, download_speed, upload_speed, ping, latitude, longitude } = body;
+  const { location, download_speed, upload_speed, ping, latitude, longitude, submission_id } = body;
   if (!location || typeof location !== 'string' || location.trim() === '') {
     throw new Error('Invalid location provided');
   }
@@ -50,7 +51,10 @@ const validatePostInput = (body: SpeedTestRequestBody) => {
   if ((latitude !== null && typeof latitude !== 'number') || (longitude !== null && typeof longitude !== 'number')) {
     throw new Error('Invalid coordinates provided');
   }
-  return { location, download_speed, upload_speed, ping, latitude, longitude };
+  if (!submission_id || typeof submission_id !== 'string') {
+    throw new Error('Invalid submission ID provided');
+  }
+  return { location, download_speed, upload_speed, ping, latitude, longitude, submission_id };
 };
 
 const parseGetRequest = (searchParams: URLSearchParams) => {
@@ -71,17 +75,25 @@ const parseGetRequest = (searchParams: URLSearchParams) => {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    console.log('POST /api/speed-test - Received body:', JSON.stringify(body, null, 2));
+    
     const address = await validateAndGetAddress();
-    const { location, download_speed, upload_speed, ping, latitude, longitude } = validatePostInput(body);
+    console.log('POST /api/speed-test - Validated address:', address);
+    
+    const { location, download_speed, upload_speed, ping, latitude, longitude, submission_id } = validatePostInput(body);
+    console.log('POST /api/speed-test - Validated input with submission_id:', submission_id);
     
     const submission_minute = new Date().toISOString().slice(0, 16);
 
     const notarizedResult = (await Oracle.notarize(async () => {
-      const timestamp = await Oracle.now();
-      return { location, download_speed, upload_speed, ping, timestamp, address, latitude, longitude, submission_minute };
+      const timestamp = await Oracle.now(); // This is in milliseconds
+      return { location, download_speed, upload_speed, ping, timestamp, address, latitude, longitude, submission_minute, submission_id };
     })) as SpeedTestPayload;
 
+    console.log('POST /api/speed-test - Notarized result with submission_id:', notarizedResult.submission_id);
+
     await insertSpeedTest(notarizedResult);
+    console.log('POST /api/speed-test - Successfully inserted speed test');
 
     return NextResponse.json({ success: true });
 

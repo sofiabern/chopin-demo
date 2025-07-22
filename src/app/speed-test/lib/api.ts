@@ -1,17 +1,14 @@
 import { SpeedTestResult } from './types';
 
-interface SubmitSpeedTestParams {
+export interface SubmitSpeedTestParams {
   location: string;
   speedTestResults: SpeedTestResult;
   coordinates: { lat: number; lng: number } | null;
+  submissionId: string;
 }
 
-export const submitSpeedTestResults = async ({
-  location,
-  speedTestResults,
-  coordinates,
-}: SubmitSpeedTestParams): Promise<{ success: boolean; message: string }> => {
-  if (!coordinates) {
+export const submitSpeedTestResults = async (params: SubmitSpeedTestParams) => {
+  if (!params.coordinates) {
     return { success: false, message: 'Cannot submit results without coordinates.' };
   }
 
@@ -22,16 +19,25 @@ export const submitSpeedTestResults = async ({
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        location,
-        download_speed: speedTestResults.download,
-        upload_speed: speedTestResults.upload,
-        ping: speedTestResults.ping,
-        latitude: coordinates.lat,
-        longitude: coordinates.lng,
+        location: params.location,
+        download_speed: params.speedTestResults.download,
+        upload_speed: params.speedTestResults.upload,
+        ping: params.speedTestResults.ping,
+        latitude: params.coordinates?.lat ?? null,
+        longitude: params.coordinates?.lng ?? null,
+        submission_id: params.submissionId,
       }),
     });
 
-    const data = await response.json();
+    // Handle empty or invalid JSON responses
+    let data;
+    try {
+      const text = await response.text();
+      data = text ? JSON.parse(text) : {};
+    } catch (jsonError) {
+      console.error('Error parsing JSON response:', jsonError);
+      data = { error: 'Invalid response from server' };
+    }
 
     if (!response.ok) {
       throw new Error(data.error || 'Failed to submit results');

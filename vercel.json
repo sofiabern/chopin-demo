@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "src/app/api/speed-test/route.ts": {
+      "includeFiles": "src/lib/seed.db"
+    }
+  }
+} 

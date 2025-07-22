@@ -40,7 +40,9 @@ export default function SpeedTestRunner({ location, coordinates, onSubmissionCom
 
   useEffect(() => {
     const cleanup = setupMessageListener({
-      setSpeedTestResults,
+      setSpeedTestResults: (results) => {
+        setSpeedTestResults(results);
+      },
       setError,
       setIsTestRunning,
     });
@@ -50,13 +52,17 @@ export default function SpeedTestRunner({ location, coordinates, onSubmissionCom
   const handleSubmit = async () => {
     if (!speedTestResults) return;
 
+    // Generate a fresh submission ID for each submit attempt to prevent duplicates
+    const freshSubmissionId = crypto.randomUUID();
+
     setIsSubmitting(true);
     setSubmissionMessage(null);
 
     const result = await submitSpeedTestResults({
       location,
       speedTestResults,
-      coordinates
+      coordinates,
+      submissionId: freshSubmissionId,
     });
 
     setSubmissionMessage(result.message);
