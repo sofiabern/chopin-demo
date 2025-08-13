@@ -25,6 +25,7 @@ export default function PastResultsTable({
       <table className="results-table">
         <thead>
           <tr>
+            <th>#</th>
             <th>Timestamp</th>
             <th>Location</th>
             <th>Download (Mbps)</th>
@@ -33,8 +34,9 @@ export default function PastResultsTable({
           </tr>
         </thead>
         <tbody>
-          {pastResults.map((result) => (
+          {pastResults.map((result, index) => (
             <tr key={result.id}>
+              <td>{index + 1}</td>
               <td>{new Date(result.timestamp).toLocaleString()}</td>
               <td>{result.location}</td>
               <td>{result.download_speed.toFixed(2)}</td>
@@ -57,7 +59,9 @@ export default function PastResultsTable({
         </span>
         <button
           onClick={() => fetchPastResults(pagination.page + 1)}
-          disabled={pagination.page >= pagination.totalPages || isFetchingPastResults}
+          disabled={
+            pagination.page >= pagination.totalPages || isFetchingPastResults
+          }
           className="btn"
         >
           Next

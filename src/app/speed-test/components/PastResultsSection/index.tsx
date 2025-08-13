@@ -25,6 +25,7 @@ export default function PastResultsSection({
   const [radius, setRadius] = useState<number>(10);
 
   const [showMyResults, setShowMyResults] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [pagination, setPagination] = useState({
     page: 1,
     pageSize: 10,
@@ -59,6 +60,10 @@ export default function PastResultsSection({
 
         if (showMyResults) {
           params.append("me", "true");
+        }
+
+        if (showLeaderboard) {
+          params.append("leaderboard", "true");
         }
 
         const response = await fetch(`/api/speed-test?${params.toString()}`);
@@ -104,6 +109,7 @@ export default function PastResultsSection({
       coordinates,
       radius,
       showMyResults,
+      showLeaderboard,
       pagination.pageSize,
     ]
   );
@@ -137,6 +143,8 @@ export default function PastResultsSection({
           showMyResults={showMyResults}
           setShowMyResults={setShowMyResults}
           handleFilterChange={handleFilterChange}
+          showLeaderboard={showLeaderboard}
+          setShowLeaderboard={setShowLeaderboard}
           isFetchingPastResults={isFetchingPastResults}
         />
       </div>

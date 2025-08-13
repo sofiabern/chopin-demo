@@ -81,6 +81,7 @@ const parseGetRequest = (searchParams: URLSearchParams) => {
   const country = searchParams.get("country");
   const city = searchParams.get("city");
   const showOnlyMyResults = searchParams.get("me") === "true";
+  const showLeaderboard = searchParams.get("leaderboard") === "true";
   const radius = searchParams.get("radius");
   const latitude = searchParams.get("latitude");
   const longitude = searchParams.get("longitude");
@@ -92,6 +93,7 @@ const parseGetRequest = (searchParams: URLSearchParams) => {
     country,
     city,
     showOnlyMyResults,
+    showLeaderboard,
     radius,
     latitude,
     longitude,
@@ -195,6 +197,7 @@ export async function GET(request: Request) {
       country,
       city,
       showOnlyMyResults,
+      showLeaderboard,
       radius,
       latitude,
       longitude,
@@ -253,6 +256,17 @@ export async function GET(request: Request) {
           result.longitude !== null &&
           haversineDistance(result.latitude, result.longitude, lat, lon) <= rad
       );
+    }
+
+    if (showLeaderboard) {
+      const bestByUser = new Map<string, (typeof filteredResults)[0]>();
+      for (const result of filteredResults) {
+        const existing = bestByUser.get(result.address);
+        if (!existing || result.download_speed > existing.download_speed) {
+          bestByUser.set(result.address, result);
+        }
+      }
+      filteredResults = Array.from(bestByUser.values());
     }
 
     const offset = (page - 1) * pageSize;

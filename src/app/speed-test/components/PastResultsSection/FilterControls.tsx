@@ -13,6 +13,8 @@ interface FilterControlsProps {
   coordinates: { lat: number; lng: number } | null;
   showMyResults: boolean;
   setShowMyResults: (show: boolean) => void;
+  showLeaderboard: boolean;
+  setShowLeaderboard: (show: boolean) => void;
   handleFilterChange: () => void;
   isFetchingPastResults: boolean;
 }
@@ -31,6 +33,8 @@ export default function FilterControls({
   coordinates,
   showMyResults,
   setShowMyResults,
+  showLeaderboard,
+  setShowLeaderboard,
   handleFilterChange,
   isFetchingPastResults,
 }: FilterControlsProps) {
@@ -96,10 +100,26 @@ export default function FilterControls({
         <input
           type="checkbox"
           checked={showMyResults}
-          onChange={(e) => setShowMyResults(e.target.checked)}
+          onChange={(e) => {
+            setShowMyResults(e.target.checked);
+            if (e.target.checked) setShowLeaderboard(false); 
+          }}
           className="checkbox"
         />
         <span className="checkbox-text">My Results</span>
+      </label>
+
+      <label className="checkbox-label">
+        <input
+          type="checkbox"
+          checked={showLeaderboard}
+          onChange={(e) => {
+            setShowLeaderboard(e.target.checked);
+            if (e.target.checked) setShowMyResults(false);
+          }}
+          className="checkbox"
+        />
+        <span className="checkbox-text">Leaderboard</span>
       </label>
 
       <button
