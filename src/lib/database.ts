@@ -5,9 +5,10 @@ import fs from 'fs';
 
 let db: Database | null = null;
 
-// The SpeedTestResult from the client/oracle
 export interface SpeedTestPayload {
   location: string;
+  country: string;
+  city: string;
   download_speed: number;
   upload_speed: number;
   ping: number;
@@ -62,44 +63,62 @@ export const initDB = async () => {
   `);
 
   // Create table if it doesn't exist (useful for local dev without seeding)
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS speed_tests (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      submission_id TEXT NOT NULL UNIQUE,
-      location TEXT NOT NULL,
-      download_speed REAL NOT NULL,
-      upload_speed REAL NOT NULL,
-      ping REAL NOT NULL,
-      timestamp DATETIME NOT NULL,
-      address TEXT NOT NULL,
-      latitude REAL,
-      longitude REAL
-    )
-  `);
+await db.exec(`
+  CREATE TABLE IF NOT EXISTS speed_tests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    submission_id TEXT NOT NULL UNIQUE,
+    location TEXT NOT NULL,
+    country TEXT NOT NULL,
+    city TEXT NOT NULL,
+    download_speed REAL NOT NULL,
+    upload_speed REAL NOT NULL,
+    ping REAL NOT NULL,
+    timestamp DATETIME NOT NULL,
+    address TEXT NOT NULL,
+    latitude REAL,
+    longitude REAL
+  )
+`);
 
   return db;
 };
 
+
 export const insertSpeedTest = async (result: SpeedTestPayload) => {
   const db = await initDB();
-  const { 
+  const {
     submission_id,
-    location, 
-    download_speed, 
-    upload_speed, 
-    ping, 
-    timestamp, 
-    address, 
-    latitude, 
-    longitude 
+    location,
+    country,
+    city,
+    download_speed,
+    upload_speed,
+    ping,
+    timestamp,
+    address,
+    latitude,
+    longitude,
   } = result;
 
   await db.run(
-    'INSERT INTO speed_tests (submission_id, location, download_speed, upload_speed, ping, timestamp, address, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [submission_id, location.trim(), download_speed, upload_speed, ping, new Date(timestamp), address, latitude, longitude]
+    `INSERT INTO speed_tests 
+    (submission_id, location, country, city, download_speed, upload_speed, ping, timestamp, address, latitude, longitude)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      submission_id,
+      location.trim(),
+      country,
+      city,
+      download_speed,
+      upload_speed,
+      ping,
+      new Date(timestamp),
+      address,
+      latitude,
+      longitude,
+    ]
   );
 };
-
 
 export const getSpeedTests = async (whereClause: string, params: (string | number)[]): Promise<SpeedTestResult[]> => {
     const db = await initDB();

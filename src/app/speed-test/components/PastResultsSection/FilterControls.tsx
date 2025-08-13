@@ -1,13 +1,16 @@
 "use client";
-
 interface FilterControlsProps {
-  filterMode: 'location' | 'radius';
-  setFilterMode: (mode: 'location' | 'radius') => void;
+  filterMode: "location" | "country" | "city" | "radius";
+  setFilterMode: (mode: "location" | "country" | "city" | "radius") => void;
   filterLocation: string;
   setFilterLocation: (location: string) => void;
+  filterCountry: string;
+  setFilterCountry: (country: string) => void;
+  filterCity: string;
+  setFilterCity: (city: string) => void;
   radius: number;
   setRadius: (radius: number) => void;
-  coordinates: { lat: number, lng: number } | null;
+  coordinates: { lat: number; lng: number } | null;
   showMyResults: boolean;
   setShowMyResults: (show: boolean) => void;
   handleFilterChange: () => void;
@@ -19,13 +22,17 @@ export default function FilterControls({
   setFilterMode,
   filterLocation,
   setFilterLocation,
+  filterCountry,
+  setFilterCountry,
+  filterCity,
+  setFilterCity,
   radius,
   setRadius,
   coordinates,
   showMyResults,
   setShowMyResults,
   handleFilterChange,
-  isFetchingPastResults
+  isFetchingPastResults,
 }: FilterControlsProps) {
   return (
     <div className="filter-controls-container">
@@ -33,19 +40,41 @@ export default function FilterControls({
         <p className="filter-group-label">Filter by:</p>
         <select
           value={filterMode}
-          onChange={(e) => setFilterMode(e.target.value as 'location' | 'radius')}
+          onChange={(e) =>
+            setFilterMode(
+              e.target.value as "location" | "country" | "city" | "radius"
+            )
+          }
           className="select-field"
         >
-          <option value="location">Name</option>
+          <option value="location">Location</option>
+          <option value="country">Country</option>
+          <option value="city">City</option>
           <option value="radius">Radius</option>
         </select>
 
-        {filterMode === 'location' ? (
+        {["location", "country", "city"].includes(filterMode) ? (
           <input
             type="text"
-            placeholder="e.g., Brazil"
-            value={filterLocation}
-            onChange={(e) => setFilterLocation(e.target.value)}
+            placeholder={
+              filterMode === "country"
+                ? "e.g., Brazil"
+                : filterMode === "city"
+                ? "e.g., São Paulo"
+                : "e.g., Brazil, São Paulo"
+            }
+            value={
+              filterMode === "country"
+                ? filterCountry
+                : filterMode === "city"
+                ? filterCity
+                : filterLocation
+            }
+            onChange={(e) => {
+              if (filterMode === "country") setFilterCountry(e.target.value);
+              else if (filterMode === "city") setFilterCity(e.target.value);
+              else setFilterLocation(e.target.value);
+            }}
             className="input-field location-input"
           />
         ) : (
@@ -76,10 +105,12 @@ export default function FilterControls({
       <button
         onClick={handleFilterChange}
         className="btn search-button"
-        disabled={isFetchingPastResults || (filterMode === 'radius' && !coordinates)}
+        disabled={
+          isFetchingPastResults || (filterMode === "radius" && !coordinates)
+        }
       >
-        {isFetchingPastResults ? 'Searching...' : 'Search'}
+        {isFetchingPastResults ? "Searching..." : "Search"}
       </button>
     </div>
   );
-} 
+}
